@@ -14,7 +14,7 @@ GLFWwindow* InitEshyUI(const std::string& WindowName, float Width, float Height)
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-	GLFWwindow* window = glfwCreateWindow(Width, Height, WindowName.c_str(), NULL, NULL);
+	GLFWwindow* window = glfwCreateWindow((int)Width, (int)Height, WindowName.c_str(), NULL, NULL);
 	eshyui_glfw_check(window);
 	glfwMakeContextCurrent(window);
 	glfwSwapInterval(1);

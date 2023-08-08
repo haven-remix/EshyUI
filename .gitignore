@@ -1,3 +1,4 @@
-EshyUI/.vs
-EshyUI/.x64
-EshyUI/EshyUI/x64
+EshyUI/.vs/*
+EshyUI/.x64/*
+EshyUI/EshyUI/x64/*
+EshyUI/Sandbox/x64/*

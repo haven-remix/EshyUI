@@ -9,13 +9,13 @@
 
 #include "glm/gtc/matrix_transform.hpp"
 
-#include <iostream>
-
-euiEntity::euiEntity(float _x, float _y, float _Width, float _Height)
+euiEntity::euiEntity(float _x, float _y, float _Width, float _Height, euiAnchor _Anchor)
 	: x(_x)
 	, y(_y)
 	, Width(_Width)
 	, Height(_Height)
+	, Anchor(_Anchor)
+	, bPointerIsHovering(false)
 	, VertexArray(nullptr)
 	, VertexBuffer(nullptr)
 	, IndexBuffer(nullptr)
@@ -25,14 +25,17 @@ euiEntity::euiEntity(float _x, float _y, float _Width, float _Height)
 
 void euiEntity::Draw(euiRenderer& Renderer)
 {
-	//Renderer.Draw(this);
-	Renderer.Draw(*VertexArray, *IndexBuffer, *Shader);
+	Renderer.Draw(this);
 }
 
 void euiEntity::SetPosition(float NewX, float NewY)
 {
-	x = NewX;
-	y = NewY;
+	float AdjustedX;
+	float AdjustedY;
+	GetAnchorAdjustedPosition(NewX, NewY, AdjustedX, AdjustedY);
+
+	x = AdjustedX;
+	y = AdjustedY;
 }
 
 void euiEntity::SetSize(float NewWidth, float NewHeight)
@@ -41,16 +44,188 @@ void euiEntity::SetSize(float NewWidth, float NewHeight)
 	Height = NewHeight;
 }
 
-
-euiSolidEntity::euiSolidEntity(float _x, float _y, float _Width, float _Height, const glm::vec4& _Color)
-	: euiEntity(_x, _y, _Width, _Height)
-	, Color(_Color)
+void euiEntity::NotifyPointerEnter()
 {
+	if (NotifyPointerEnterCallback)
+		NotifyPointerEnterCallback(this);
+}
+
+void euiEntity::NotifyPointerExit()
+{
+	if (NotifyPointerExitCallback)
+		NotifyPointerExitCallback(this);
+}
+
+void euiEntity::NotifyPointerHover()
+{
+	if (NotifyPointerHoverCallback)
+		NotifyPointerHoverCallback(this);
+}
+
+void euiEntity::NotifyPointerPressed()
+{
+	if (NotifyPointerPressedCallback)
+		NotifyPointerPressedCallback(this);
+}
+
+void euiEntity::NotifyPointerUnpressed()
+{
+	if (NotifyPointerUnpressedCallback)
+		NotifyPointerUnpressedCallback(this);
+}
+
+void euiEntity::NotifyPointerHeld()
+{
+	if (NotifyPointerHeldCallback)
+		NotifyPointerHeldCallback(this);
+}
+
+void euiEntity::NotifyPointerStatus(bool bCurrentlyHovering, bool bCurrentlyPressed)
+{
+	if (!bPointerIsHovering && bCurrentlyHovering)
+	{
+		bPointerIsHovering = true;
+		NotifyPointerEnter();
+	}
+	else if (bPointerIsHovering && !bCurrentlyHovering)
+	{
+		bPointerIsHovering = false;
+		NotifyPointerExit();
+	}
+	else if (bPointerIsHovering && bCurrentlyHovering)
+	{
+		NotifyPointerHover();
+	}
+
+	if (!bPointerIsPressed && bCurrentlyPressed)
+	{
+		bPointerIsPressed = true;
+		NotifyPointerPressed();
+	}
+	else if (bPointerIsPressed && !bCurrentlyPressed)
+	{
+		bPointerIsPressed = false;
+		NotifyPointerUnpressed();
+	}
+	else if (bPointerIsPressed && bCurrentlyPressed)
+	{
+		NotifyPointerHeld();
+	}
+}
+
+void euiEntity::CheckPointerStatus(double PointerXPos, double PointerYPos, bool bLeftButtonPressed)
+{
+	const bool bIsHovered = PointerXPos > GetX() && PointerXPos < GetX() + GetWidth() && PointerYPos > GetY() && PointerYPos < GetY() + GetHeight();
+
+	if (!bPointerIsHovering && bIsHovered)
+	{
+		bPointerIsHovering = true;
+		NotifyPointerEnter();
+	}
+	else if (bPointerIsHovering && !bIsHovered)
+	{
+		bPointerIsHovering = false;
+		NotifyPointerExit();
+	}
+	else if (bPointerIsHovering && bIsHovered)
+	{
+		NotifyPointerHover();
+	}
+
+	if (!bPointerIsPressed && bLeftButtonPressed && bIsHovered)
+	{
+		bPointerIsPressed = true;
+		NotifyPointerPressed();
+	}
+	else if (bPointerIsPressed && !(bLeftButtonPressed && bIsHovered))
+	{
+		bPointerIsPressed = false;
+		NotifyPointerUnpressed();
+	}
+	else if (bPointerIsPressed && bLeftButtonPressed && bIsHovered)
+	{
+		NotifyPointerHeld();
+	}
+}
+
+void euiEntity::GetAnchorAdjustedPosition(float _x, float _y, float& NewX, float& NewY) const
+{
+	float AdjustedX = 0.0f;
+	float AdjustedY = 0.0f;
+
+	switch (Anchor)
+	{
+	case EUI_ANCHOR_CENTER:
+	{
+		AdjustedX = _x + -(Width / 2);
+		AdjustedY = _y + -(Height / 2);
+		break;
+	}
+	case EUI_ANCHOR_LEFT_TOP:
+	{
+		AdjustedX = _x;
+		AdjustedY = _y - Height;
+		break;
+	}
+	case EUI_ANCHOR_LEFT_MIDDLE:
+	{
+		AdjustedX = _x;
+		AdjustedY = _y - (Height / 2);
+		break;
+	}
+	case EUI_ANCHOR_LEFT_BOTTOM:
+	{
+		AdjustedX = _x;
+		AdjustedY = _y;
+		break;
+	}
+	case EUI_ANCHOR_RIGHT_TOP:
+	{
+		AdjustedX = _x - Width;
+		AdjustedY = _y - Height;
+		break;
+	}
+	case EUI_ANCHOR_RIGHT_MIDDLE:
+	{
+		AdjustedX = _x - Width;
+		AdjustedY = _y - (Height / 2);
+		break;
+	}
+	case EUI_ANCHOR_RIGHT_BOTTOM:
+	{
+		AdjustedX = _x - Width;
+		AdjustedY = _y;
+		break;
+	}
+	case EUI_ANCHOR_TOP_MIDDLE:
+	{
+		AdjustedX = _x + -(Width / 2);
+		AdjustedY = _y - Height;
+		break;
+	}
+	case EUI_ANCHOR_BOTTOM_MIDDLE:
+	{
+		AdjustedX = _x + -(Width / 2);
+		AdjustedY = _y;
+		break;
+	}
+	};
+
+	NewX = AdjustedX;
+	NewY = AdjustedY;
+}
+
+
+euiSolidEntity::euiSolidEntity(float _x, float _y, float _Width, float _Height, euiAnchor _Anchor)
+	: euiEntity(_x, _y, _Width, _Height, _Anchor)
+{
+	SetPosition(_x, _y);
+
 	float positions[] = {
-		 _x,		  _y,			//Bottom left
-		 _x + _Width, _y,			//Bottom right
-		 _x + _Width, _y + _Height, //Top right
-		 _x,		  _y + _Height, //Top left
+		 0.0f,		    0.0f,			//Bottom left
+		 0.0f + _Width, 0.0f,			//Bottom right
+		 0.0f + _Width, 0.0f + _Height, //Top right
+		 0.0f,		    0.0f + _Height, //Top left
 	};
 
 	uint indicies[] = {
@@ -70,8 +245,6 @@ euiSolidEntity::euiSolidEntity(float _x, float _y, float _Width, float _Height, 
 	IndexBuffer->InitializeIndexBuffer(indicies, 6);
 
 	Shader = new euiShader("Resources\\solid.vshader", "Resources\\solid.fshader");
-	Shader->Bind();
-	Shader->SetUniform4f("u_color", _Color.r, _Color.g, _Color.b, _Color.a);
 
 	VertexArray->Unbind();
 	Shader->Unbind();
@@ -79,26 +252,93 @@ euiSolidEntity::euiSolidEntity(float _x, float _y, float _Width, float _Height, 
 	IndexBuffer->Unbind();
 }
 
-void euiSolidEntity::SetColor(const glm::vec4& _Color)
+void euiSolidEntity::Draw(class euiRenderer& Renderer)
 {
-	Color = _Color;
+	Renderer.Draw(this, CurrentColor);
 }
 
-void euiSolidEntity::SetColor(float r, float g, float b, float a)
+void euiSolidEntity::ForceUpdateColor()
 {
-	Color = glm::vec4(r, g, b, a);
+	if (bPointerIsHovering && !bPointerIsPressed)
+		CurrentColor = HoveredColor;
+	else if (bPointerIsHovering && bPointerIsPressed)
+		CurrentColor = PressedColor;
+	else
+		CurrentColor = NormalColor;
+}
+
+void euiSolidEntity::SetNormalColor(const glm::vec4& Color)
+{
+	NormalColor = Color;
+	ForceUpdateColor();
+}
+
+void euiSolidEntity::SetNormalColor(float r, float g, float b, float a)
+{
+	NormalColor = glm::vec4(r, g, b, a);
+	ForceUpdateColor();
+}
+
+void euiSolidEntity::SetHoveredColor(const glm::vec4& Color)
+{
+	HoveredColor = Color;
+	ForceUpdateColor();
+}
+
+void euiSolidEntity::SetHoveredColor(float r, float g, float b, float a)
+{
+	HoveredColor = glm::vec4(r, g, b, a);
+	ForceUpdateColor();
+}
+
+void euiSolidEntity::SetPressedColor(const glm::vec4& Color)
+{
+	PressedColor = Color;
+	ForceUpdateColor();
+}
+
+void euiSolidEntity::SetPressedColor(float r, float g, float b, float a)
+{
+	PressedColor = glm::vec4(r, g, b, a);
+	ForceUpdateColor();
+}
+
+void euiSolidEntity::NotifyPointerEnter()
+{
+	ForceUpdateColor();
+	euiEntity::NotifyPointerEnter();
+}
+
+void euiSolidEntity::NotifyPointerExit()
+{
+	ForceUpdateColor();
+	euiEntity::NotifyPointerExit();
+}
+
+void euiSolidEntity::NotifyPointerPressed()
+{
+	ForceUpdateColor();
+	euiEntity::NotifyPointerPressed();
+}
+
+void euiSolidEntity::NotifyPointerUnpressed()
+{
+	ForceUpdateColor();
+	euiEntity::NotifyPointerUnpressed();
 }
 
 
-euiImageEntity::euiImageEntity(float _x, float _y, float _Width, float _Height, euiRenderer* Renderer, const std::string& ImagePath)
-	: euiEntity(_x, _y, _Width, _Height)
+euiImageEntity::euiImageEntity(float _x, float _y, float _Width, float _Height, euiAnchor _Anchor, euiRenderer* Renderer, const std::string& ImagePath)
+	: euiEntity(_x, _y, _Width, _Height, _Anchor)
 	, Texture(nullptr)
 {
+	SetPosition(_x, _y);
+
 	float positions[] = {
-		 _x,		  _y,			0.0f, 0.0f,   //Bottom left
-		 _x + _Width, _y,			1.0f, 0.0f,   //Bottom right
-		 _x + _Width, _y + _Height, 1.0f, 1.0f,   //Top right
-		 _x,		  _y + _Height, 0.0f, 1.0f    //Top left
+		 0.0f,		    0.0f,			0.0f, 0.0f,   //Bottom left
+		 0.0f + _Width, 0.0f,			1.0f, 0.0f,   //Bottom right
+		 0.0f + _Width, 0.0f + _Height, 1.0f, 1.0f,   //Top right
+		 0.0f,		    0.0f + _Height, 0.0f, 1.0f    //Top left
 	};
 
 	uint indicies[] = {

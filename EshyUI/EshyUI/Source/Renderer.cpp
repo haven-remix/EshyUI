@@ -12,6 +12,11 @@
 
 #include <iostream>
 
+static glm::mat4 CreateMVPMatrix(const glm::mat4& ProjectionMatrix, const euiEntity* Entity)
+{
+	return ProjectionMatrix * glm::translate(glm::mat4(1.0f), glm::vec3(Entity->GetX(), Entity->GetY(), 0.0f));
+}
+
 euiRenderer::euiRenderer(GLFWwindow* _Window)
 	: Window(_Window)
 {
@@ -27,6 +32,11 @@ void euiRenderer::Clear() const
 	glClear(GL_COLOR_BUFFER_BIT);
 }
 
+void euiRenderer::SetBackgroundColor(glm::vec4 Color)
+{
+	glClearColor(Color.r, Color.g, Color.b, Color.a);
+}
+
 void euiRenderer::Draw(const euiVertexArray& va, const euiIndexBuffer& ib, euiShader& shader)
 {
 	shader.Bind();
@@ -37,10 +47,21 @@ void euiRenderer::Draw(const euiVertexArray& va, const euiIndexBuffer& ib, euiSh
 	glDrawElements(GL_TRIANGLES, ib.GetCount(), GL_UNSIGNED_INT, nullptr);
 }
 
+void euiRenderer::Draw(class euiEntity* Entity, const glm::vec4 Color)
+{
+	Entity->GetShader()->Bind();
+	Entity->GetShader()->SetUniformMat4f("u_mvp", CreateMVPMatrix(GetProjectionMatrix(), Entity));
+	Entity->GetShader()->SetUniform4f("u_color", Color.r, Color.g, Color.b, Color.a);
+	Entity->GetVertexArray()->Bind();
+	Entity->GetIndexBuffer()->Bind();
+
+	glDrawElements(GL_TRIANGLES, Entity->GetIndexBuffer()->GetCount(), GL_UNSIGNED_INT, nullptr);
+}
+
 void euiRenderer::Draw(euiEntity* Entity, euiTexture* Texture)
 {
 	Entity->GetShader()->Bind();
-	Entity->GetShader()->SetUniformMat4f("u_mvp", GetProjectionMatrix());
+	Entity->GetShader()->SetUniformMat4f("u_mvp", CreateMVPMatrix(GetProjectionMatrix(), Entity));
 	Entity->GetVertexArray()->Bind();
 	Entity->GetIndexBuffer()->Bind();
 
@@ -53,8 +74,11 @@ void euiRenderer::Draw(euiEntity* Entity, euiTexture* Texture)
 	glDrawElements(GL_TRIANGLES, Entity->GetIndexBuffer()->GetCount(), GL_UNSIGNED_INT, nullptr);
 }
 
+
 void euiRenderer::UpdateScreenSize(float Width, float Height)
 {
+	WindowWidth = Width;
+	WindowHeight = Height;
 	ProjectionMatrix = glm::ortho(0.0f, Width, 0.0f, Height, -1.0f, 1.0f);
 	glfwSetWindowSize(Window, (int)Width, (int)Height);
 }
@@ -79,7 +103,7 @@ int euiRenderer::GetFirstUnboundTextureSlot()
 		{
 			uint last = TextureBindingInfo.rbegin()->first;
 
-			if (last < MaxTextureSlots - 1)
+			if (last < (uint)MaxTextureSlots - 1)
 				return last + 1;
 		}
 	}
